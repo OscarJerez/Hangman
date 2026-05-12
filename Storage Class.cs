@@ -12,8 +12,30 @@ namespace Hangman
 
         public JsonStorage(string filePath)
         {
-            _filePath = filePath;
+            // Handle file path - check multiple locations
+            _filePath = ResolveFilePath(filePath);
             LoadWords();
+        }
+
+        private string ResolveFilePath(string filePath)
+        {
+            // Try 1: Current directory
+            if (File.Exists(filePath))
+                return filePath;
+
+            // Try 2: Executable directory
+            string execPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, filePath);
+            if (File.Exists(execPath))
+                return execPath;
+
+            // Try 3: Parent directories
+            string currentDir = Directory.GetCurrentDirectory();
+            string parentPath = Path.Combine(currentDir, filePath);
+            if (File.Exists(parentPath))
+                return parentPath;
+
+            // If not found, return the original (will create with defaults)
+            return filePath;
         }
 
         public string ReadData(string difficulty = "easy")
@@ -30,7 +52,7 @@ namespace Hangman
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading data: {ex.Message}");
-                return null!;
+                return "hangman";
             }
         }
 
@@ -60,18 +82,31 @@ namespace Hangman
                     var lines = File.ReadAllLines(_filePath);
                     foreach (var line in lines)
                     {
-                        var parts = line.Split(':');
+                        var trimmedLine = line.Trim();
+                        if (string.IsNullOrWhiteSpace(trimmedLine))
+                            continue;
+
+                        var parts = trimmedLine.Split(':');
                         if (parts.Length == 2)
                         {
                             string word = parts[0].Trim().ToLower();
                             string difficulty = parts[1].Trim().ToLower();
 
-                            if (_wordsByDifficulty.ContainsKey(difficulty))
+                            if (!string.IsNullOrWhiteSpace(word) && _wordsByDifficulty.ContainsKey(difficulty))
                             {
                                 _wordsByDifficulty[difficulty].Add(word);
                             }
                         }
                     }
+
+                    // Debug info
+                    Console.WriteLine($"✓ Loaded words - Easy: {_wordsByDifficulty["easy"].Count}, Medium: {_wordsByDifficulty["medium"].Count}, Hard: {_wordsByDifficulty["hard"].Count}");
+                }
+                else
+                {
+                    Console.WriteLine($"⚠ Warning: word.json not found at {_filePath}");
+                    Console.WriteLine($"Current directory: {Directory.GetCurrentDirectory()}");
+                    Console.WriteLine($"Executable directory: {AppDomain.CurrentDomain.BaseDirectory}");
                 }
             }
             catch (Exception ex)
